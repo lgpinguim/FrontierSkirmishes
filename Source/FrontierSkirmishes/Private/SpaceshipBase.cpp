@@ -1,157 +1,250 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "SpaceshipBase.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
-#include "EnhancedInputComponent.h"  // NEW
-#include "EnhancedInputSubsystems.h"  // NEW
-#include "InputActionValue.h"  // NEW
+#include "EnhancedInputComponent.h"  
+#include "EnhancedInputSubsystems.h" 
+#include "InputActionValue.h"
+//#include "LockOnComponent.h"
+//#include "WeaponSystemComponent.h"
+//#include "TargetLeadComponent.h"
 
-// Sets default values
 ASpaceshipBase::ASpaceshipBase()
 {
-    // Enable Tick (called every frame)
     PrimaryActorTick.bCanEverTick = true;
 
-    // CREATE COMPONENTS
-
-    // Root component - invisible point that everything attaches to
     ShipRoot = CreateDefaultSubobject<USceneComponent>(TEXT("ShipRoot"));
     RootComponent = ShipRoot;
 
-    // Ship mesh - the visual representation
     ShipMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShipMesh"));
     ShipMesh->SetupAttachment(ShipRoot);
 
-    // Camera boom - keeps camera at distance behind ship
     CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
     CameraBoom->SetupAttachment(ShipRoot);
-    CameraBoom->TargetArmLength = 800.0f; // Distance behind ship
-    CameraBoom->bUsePawnControlRotation = false; // Camera follows ship rotation
-    CameraBoom->bInheritPitch = true;
-    CameraBoom->bInheritYaw = true;
-    CameraBoom->bInheritRoll = true;
+    CameraBoom->TargetArmLength = 800.0f;
+    CameraBoom->bUsePawnControlRotation = false;
+    CameraBoom->bInheritPitch = false;
+    CameraBoom->bInheritYaw = false;
+    CameraBoom->bInheritRoll = false;
 
-    // Camera - what the player sees through
     Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
     Camera->SetupAttachment(CameraBoom);
 
-    // SET DEFAULT MOVEMENT VALUES (tweakable in editor)
+    // Create advanced system components
+    //LockOnComponent = CreateDefaultSubobject<ULockOnComponent>(TEXT("LockOnComponent"));
+    //WeaponSystem = CreateDefaultSubobject<UWeaponSystemComponent>(TEXT("WeaponSystem"));
+    //TargetLeadComponent = CreateDefaultSubobject<UTargetLeadComponent>(TEXT("TargetLeadComponent"));
 
-    ThrustPower = 2000.0f;      // Acceleration force
-    MaxSpeed = 3000.0f;         // Top speed
-    Drag = 0.95f;               // How quickly ship slows (0.95 = 5% speed loss per frame)
-    PitchSpeed = 100.0f;        // Rotation speed up/down
-    YawSpeed = 100.0f;          // Rotation speed left/right
-    RollSpeed = 150.0f;         // Rotation speed for barrel rolls
+    MaxSpeed = 4000.0f;
+    MinSpeed = 500.0f;
+    Acceleration = 1500.0f;
+    Deceleration = 1200.0f;
 
-    CurrentVelocity = FVector::ZeroVector; // Start stationary
+    MaxTurnRate = 200.0f;
+    TurnResponsiveness = 6.0f;
+    RollRate = 115.0f;
 
+    MouseSensitivity = 1.0f;
+    AutoRollStrength = 60.0f;
+    AutoLevelSpeed = 2.0f;
+    MaxPitchAngle = 179.0f; 
+    MaxYawAngle = 179.0f;   
+    MaxRollAngle = 180.0f;  
+
+    BoostDodgeStrength = 2500.0f;
+    BoostDodgeDuration = 0.25f;
+    BoostDodgeCooldown = 1.0f;
 }
 
-// Called when the game starts or when spawned
 void ASpaceshipBase::BeginPlay()
 {
-	Super::BeginPlay();
+    Super::BeginPlay();
 
-    if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+    if (APlayerController* PC = Cast<APlayerController>(GetController()))
     {
         if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
-            ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+            ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
         {
             Subsystem->AddMappingContext(InputMapping, 0);
         }
+
+        PC->bShowMouseCursor = false;
+        PC->bEnableClickEvents = false;
+        PC->bEnableMouseOverEvents = false;
+        PC->SetInputMode(FInputModeGameOnly());
     }
-	
 }
 
-// Called every frame
 void ASpaceshipBase::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
-    CurrentVelocity *= Drag;
-
-    if (CurrentVelocity.Size() > MaxSpeed)
-    {
-        CurrentVelocity = CurrentVelocity.GetSafeNormal() * MaxSpeed;
-    }
-
-    FVector NewLocation = GetActorLocation() + (CurrentVelocity * DeltaTime);
-    SetActorLocation(NewLocation);
+    UpdateBoostDodge(DeltaTime);
+    UpdateRotation(DeltaTime);
+    UpdateVelocity(DeltaTime);
 }
 
-// Called to bind functionality to input
 void ASpaceshipBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-    // Cast to Enhanced Input Component
-    if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+    if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
     {
-        // Bind actions
-        EnhancedInputComponent->BindAction(ThrustAction, ETriggerEvent::Triggered, this, &ASpaceshipBase::ThrustInput);
-        EnhancedInputComponent->BindAction(PitchAction, ETriggerEvent::Triggered, this, &ASpaceshipBase::PitchInput);
-        EnhancedInputComponent->BindAction(YawAction, ETriggerEvent::Triggered, this, &ASpaceshipBase::YawInput);
-        EnhancedInputComponent->BindAction(RollAction, ETriggerEvent::Triggered, this, &ASpaceshipBase::RollInput);
+        EIC->BindAction(MouseAimAction, ETriggerEvent::Triggered, this, &ASpaceshipBase::HandleMouseAim);
+        EIC->BindAction(ThrottleAction, ETriggerEvent::Triggered, this, &ASpaceshipBase::HandleThrottle);
+        EIC->BindAction(RollAction, ETriggerEvent::Triggered, this, &ASpaceshipBase::HandleRoll);
+        EIC->BindAction(BoostDodgeAction, ETriggerEvent::Started, this, &ASpaceshipBase::HandleBoostDodge);
+        EIC->BindAction(PrimaryWeaponAction, ETriggerEvent::Triggered, this, &ASpaceshipBase::HandlePrimaryWeapon);
+        EIC->BindAction(SecondaryWeaponAction, ETriggerEvent::Started, this, &ASpaceshipBase::HandleSecondaryWeapon);
+        EIC->BindAction(CycleWeaponAction, ETriggerEvent::Started, this, &ASpaceshipBase::HandleCycleWeapon);
     }
 }
 
-void ASpaceshipBase::ThrustInput(const FInputActionValue& Value)
+void ASpaceshipBase::HandleMouseAim(const FInputActionValue& Value)
 {
-    float InputValue = Value.Get<float>();
+    MouseInput = Value.Get<FVector2D>();
+}
 
-    if (InputValue != 0.0f)
+void ASpaceshipBase::HandleThrottle(const FInputActionValue& Value)
+{
+    ThrottleInput = Value.Get<float>();
+}
+
+void ASpaceshipBase::HandleRoll(const FInputActionValue& Value)
+{
+    ManualRollInput = Value.Get<float>();
+}
+
+void ASpaceshipBase::HandleBoostDodge(const FInputActionValue& Value)
+{
+    if (!CanBoostDodge()) return;
+
+    FVector2D DodgeInput = Value.Get<FVector2D>();
+    if (!DodgeInput.IsNearlyZero())
     {
-        FVector ForwardDirection = GetActorForwardVector();
-        CurrentVelocity += ForwardDirection * ThrustPower * InputValue * GetWorld()->GetDeltaSeconds();
+        // Convert 2D input to 3D world space dodge direction
+        FVector Forward = GetActorForwardVector();
+        FVector Right = GetActorRightVector();
+        FVector Up = GetActorUpVector();
+
+        BoostDodgeDirection = (Forward * DodgeInput.Y + Right * DodgeInput.X).GetSafeNormal();
+        bIsBoostDodging = true;
+        BoostDodgeTimer = 0.0f;
+        BoostDodgeCooldownTimer = BoostDodgeCooldown;
     }
 }
 
-void ASpaceshipBase::PitchInput(const FInputActionValue& Value)
+void ASpaceshipBase::HandlePrimaryWeapon(const FInputActionValue& Value)
 {
-    float InputValue = Value.Get<float>();
+    //if (WeaponSystem)
+    //{
+    //    WeaponSystem->FirePrimaryWeapon();
+    //}
+}
 
-    if (InputValue != 0.0f)
+void ASpaceshipBase::HandleSecondaryWeapon(const FInputActionValue& Value)
+{
+    //if (WeaponSystem)
+    //{
+    //    WeaponSystem->FireSecondaryWeapon();
+    //}
+}
+
+void ASpaceshipBase::HandleCycleWeapon(const FInputActionValue& Value)
+{
+    //if (WeaponSystem)
+    //{
+    //    WeaponSystem->CycleWeapon();
+    //}
+}
+
+void ASpaceshipBase::UpdateRotation(float DeltaTime)
+{
+    FRotator CurrentRotation = GetActorRotation();
+    FRotator RotationDelta = FRotator::ZeroRotator;
+
+    if (!MouseInput.IsNearlyZero(0.01f))
     {
-        float DeltaTime = GetWorld()->GetDeltaSeconds();
-        float PitchAmount = InputValue * PitchSpeed * DeltaTime;
+        FVector2D ScaledMouseInput = MouseInput * MouseSensitivity;
+        RotationDelta.Yaw = ScaledMouseInput.X * MaxTurnRate * DeltaTime;
+        RotationDelta.Pitch = -ScaledMouseInput.Y * MaxTurnRate * DeltaTime;
+    }
 
-        FRotator NewRotation = GetActorRotation();
-        NewRotation.Pitch += PitchAmount;
+    RotationDelta.Roll = ManualRollInput * RollRate * DeltaTime;
+
+    if (FMath::Abs(MouseInput.X) > 0.2f && FMath::Abs(ManualRollInput) < 0.1f)
+    {
+        RotationDelta.Roll += MouseInput.X * AutoRollStrength * DeltaTime;
+    }
+
+    if (!RotationDelta.IsZero())
+    {
+        FRotator TargetRotation = CurrentRotation + RotationDelta;
+
+        TargetRotation.Normalize();
+
+        FRotator NewRotation = FMath::RInterpTo(CurrentRotation, TargetRotation, DeltaTime, TurnResponsiveness);
         SetActorRotation(NewRotation);
     }
+    else
+    {
+        if (FMath::Abs(CurrentRotation.Roll) > 1.0f)
+        {
+            FRotator LevelRotation = CurrentRotation;
+            LevelRotation.Roll = FMath::FInterpTo(CurrentRotation.Roll, 0.0f, DeltaTime, AutoLevelSpeed);
+            SetActorRotation(LevelRotation);
+        }
+    }
+
+    MouseInput = FVector2D::ZeroVector;
 }
 
-void ASpaceshipBase::YawInput(const FInputActionValue& Value)
+void ASpaceshipBase::UpdateVelocity(float DeltaTime)
 {
-    float InputValue = Value.Get<float>();
+    float TargetSpeed = FMath::Lerp(MinSpeed, MaxSpeed, ThrottleInput);
 
-    if (InputValue != 0.0f)
+    if (CurrentSpeed < TargetSpeed)
     {
-        float DeltaTime = GetWorld()->GetDeltaSeconds();
-        float YawAmount = InputValue * YawSpeed * DeltaTime;
+        CurrentSpeed = FMath::Min(CurrentSpeed + Acceleration * DeltaTime, TargetSpeed);
+    }
+    else
+    {
+        CurrentSpeed = FMath::Max(CurrentSpeed - Deceleration * DeltaTime, TargetSpeed);
+    }
 
-        FRotator NewRotation = GetActorRotation();
-        NewRotation.Yaw += YawAmount;
-        SetActorRotation(NewRotation);
+    FVector BaseVelocity = GetActorForwardVector() * CurrentSpeed;
+
+    if (bIsBoostDodging)
+    {
+        float DodgeStrength = FMath::Lerp(BoostDodgeStrength, 0.0f, BoostDodgeTimer / BoostDodgeDuration);
+        BaseVelocity += BoostDodgeDirection * DodgeStrength;
+    }
+
+    CurrentVelocity = BaseVelocity;
+
+    FVector NewLocation = GetActorLocation() + CurrentVelocity * DeltaTime;
+    SetActorLocation(NewLocation, true);
+}
+
+void ASpaceshipBase::UpdateBoostDodge(float DeltaTime)
+{
+    if (bIsBoostDodging)
+    {
+        BoostDodgeTimer += DeltaTime;
+        if (BoostDodgeTimer >= BoostDodgeDuration)
+        {
+            bIsBoostDodging = false;
+        }
+    }
+
+    if (BoostDodgeCooldownTimer > 0.0f)
+    {
+        BoostDodgeCooldownTimer -= DeltaTime;
     }
 }
 
-void ASpaceshipBase::RollInput(const FInputActionValue& Value)
+FRotator ASpaceshipBase::SmoothRotateTowards(const FRotator& Current, const FRotator& Target, float DeltaTime, float InterpSpeed)
 {
-    float InputValue = Value.Get<float>();
-
-    if (InputValue != 0.0f)
-    {
-        float DeltaTime = GetWorld()->GetDeltaSeconds();
-        float RollAmount = InputValue * RollSpeed * DeltaTime;
-
-        FRotator NewRotation = GetActorRotation();
-        NewRotation.Roll += RollAmount;
-        SetActorRotation(NewRotation);
-    }
+    return FMath::RInterpTo(Current, Target, DeltaTime, InterpSpeed);
 }

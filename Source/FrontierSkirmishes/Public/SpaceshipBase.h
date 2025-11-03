@@ -1,97 +1,163 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
-#include "InputActionValue.h" 
+#include "InputActionValue.h"
 #include "SpaceshipBase.generated.h"
+
+// Forward declarations
+//class ULockOnComponent;
+//class UWeaponSystemComponent;
+//class UTargetLeadComponent;
 
 UCLASS()
 class FRONTIERSKIRMISHES_API ASpaceshipBase : public APawn
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	// Sets default values for this pawn's properties
-	ASpaceshipBase();
+    ASpaceshipBase();
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+    virtual void BeginPlay() override;
 
-    // Root component - the main collision
+    // COMPONENTS
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     class USceneComponent* ShipRoot;
 
-    // Visual mesh of the ship
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     class UStaticMeshComponent* ShipMesh;
 
-    // Camera boom (spring arm) - follows ship at distance
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     class USpringArmComponent* CameraBoom;
 
-    // Camera component
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     class UCameraComponent* Camera;
 
-    // Input Mapping Context
+    //TODO: Other Components
+    //UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    //ULockOnComponent* LockOnComponent;
+
+    //UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    //UWeaponSystemComponent* WeaponSystem;
+
+    //UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    //UTargetLeadComponent* TargetLeadComponent;
+
+    // INPUT
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     class UInputMappingContext* InputMapping;
 
-    // Input Actions
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-    class UInputAction* ThrustAction;
+    class UInputAction* MouseAimAction;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-    class UInputAction* PitchAction;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-    class UInputAction* YawAction;
+    class UInputAction* ThrottleAction; 
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     class UInputAction* RollAction;
 
-    // MOVEMENT PROPERTIES
-    // How fast the ship accelerates forward
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-    float ThrustPower;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    class UInputAction* BoostDodgeAction;  // Quick directional boost
 
-    // Maximum speed the ship can reach
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    class UInputAction* PrimaryWeaponAction;  // Machine guns
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    class UInputAction* SecondaryWeaponAction;  // Missiles
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    class UInputAction* CycleWeaponAction;  // Switch missile types
+
+    // MOVEMENT PROPERTIES
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
     float MaxSpeed;
 
-    // How quickly ship slows down when not thrusting
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-    float Drag;
+    float MinSpeed;
 
-    // How fast the ship rotates (pitch - up/down)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-    float PitchSpeed;
+    float Acceleration;
 
-    // How fast the ship rotates (yaw - left/right)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-    float YawSpeed;
+    float Deceleration;
 
-    // How fast the ship rotates (roll - barrel roll)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-    float RollSpeed;
+    float TurnResponsiveness;  // How quickly ship follows mouse
 
-    // CURRENT MOVEMENT STATE
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+    float MaxTurnRate;  // Limits how fast we can turn
 
-    // Current velocity of the ship
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+    float RollRate;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+    float MouseSensitivity;  // How sensitive mouse input is
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+    float AutoRollStrength;  // How much ship rolls into turns
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+    float AutoLevelSpeed;  // How fast ship returns to level flight
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+    float MaxPitchAngle;  // Maximum pitch up/down in degrees
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+    float MaxYawAngle;    // Maximum yaw left/right in degrees
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+    float MaxRollAngle;    // Maximum roll angle in degrees (recommended: 60-90 degrees)
+
+    // BOOST DODGE 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Boost Dodge")
+    float BoostDodgeStrength;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Boost Dodge")
+    float BoostDodgeDuration;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Boost Dodge")
+    float BoostDodgeCooldown;
+
+    // CURRENT STATE
+    FVector2D MouseInput;
+    float ThrottleInput;
+    float ManualRollInput;
+
     FVector CurrentVelocity;
+    float CurrentSpeed;
+
+    // Boost Dodge state
+    bool bIsBoostDodging;
+    FVector BoostDodgeDirection;
+    float BoostDodgeTimer;
+    float BoostDodgeCooldownTimer;
 
     // INPUT FUNCTIONS
+    void HandleMouseAim(const FInputActionValue& Value);
+    void HandleThrottle(const FInputActionValue& Value);
+    void HandleRoll(const FInputActionValue& Value);
+    void HandleBoostDodge(const FInputActionValue& Value);
+    void HandlePrimaryWeapon(const FInputActionValue& Value);
+    void HandleSecondaryWeapon(const FInputActionValue& Value);
+    void HandleCycleWeapon(const FInputActionValue& Value);
 
-    // INPUT FUNCTIONS
-    void ThrustInput(const FInputActionValue& Value);
-    void PitchInput(const FInputActionValue& Value);
-    void YawInput(const FInputActionValue& Value);
-    void RollInput(const FInputActionValue& Value);
+    // ADVANCED MOVEMENT FUNCTIONS
+    void UpdateRotation(float DeltaTime);
+    void UpdateVelocity(float DeltaTime);
+    void UpdateBoostDodge(float DeltaTime);
+
+    // Smooth rotation helper
+    FRotator SmoothRotateTowards(const FRotator& Current, const FRotator& Target, float DeltaTime, float InterpSpeed);
 
 public:
     virtual void Tick(float DeltaTime) override;
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+    // Getters for UI and other systems
+    UFUNCTION(BlueprintPure, Category = "Spaceship")
+    float GetCurrentThrottlePercent() const { return (CurrentSpeed - MinSpeed) / (MaxSpeed - MinSpeed); }
+
+    UFUNCTION(BlueprintPure, Category = "Spaceship")
+    bool CanBoostDodge() const { return BoostDodgeCooldownTimer <= 0.0f && !bIsBoostDodging; }
 };
