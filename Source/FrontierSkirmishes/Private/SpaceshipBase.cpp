@@ -103,7 +103,7 @@ void ASpaceshipBase::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 
 void ASpaceshipBase::HandleMouseAim(const FInputActionValue& Value)
 {
-    MouseInput = Value.Get<FVector2D>();
+    AimInput = Value.Get<FVector2D>();
 }
 
 void ASpaceshipBase::HandleThrottle(const FInputActionValue& Value)
@@ -164,18 +164,18 @@ void ASpaceshipBase::UpdateRotation(float DeltaTime)
     FRotator CurrentRotation = GetActorRotation();
     FRotator RotationDelta = FRotator::ZeroRotator;
 
-    if (!MouseInput.IsNearlyZero(0.01f))
+    if (!AimInput.IsNearlyZero(0.01f))
     {
-        FVector2D ScaledMouseInput = MouseInput * MouseSensitivity;
+        FVector2D ScaledMouseInput = AimInput * MouseSensitivity;
         RotationDelta.Yaw = ScaledMouseInput.X * MaxTurnRate * DeltaTime;
         RotationDelta.Pitch = -ScaledMouseInput.Y * MaxTurnRate * DeltaTime;
     }
 
     RotationDelta.Roll = ManualRollInput * RollRate * DeltaTime;
 
-    if (FMath::Abs(MouseInput.X) > 0.2f && FMath::Abs(ManualRollInput) < 0.1f)
+    if (FMath::Abs(AimInput.X) > 0.2f && FMath::Abs(ManualRollInput) < 0.1f)
     {
-        RotationDelta.Roll += MouseInput.X * AutoRollStrength * DeltaTime;
+        RotationDelta.Roll += AimInput.X * AutoRollStrength * DeltaTime;
     }
 
     if (!RotationDelta.IsZero())
@@ -197,7 +197,7 @@ void ASpaceshipBase::UpdateRotation(float DeltaTime)
         }
     }
 
-    MouseInput = FVector2D::ZeroVector;
+    AimInput = FVector2D::ZeroVector;
 }
 
 void ASpaceshipBase::UpdateVelocity(float DeltaTime)
@@ -242,9 +242,4 @@ void ASpaceshipBase::UpdateBoostDodge(float DeltaTime)
     {
         BoostDodgeCooldownTimer -= DeltaTime;
     }
-}
-
-FRotator ASpaceshipBase::SmoothRotateTowards(const FRotator& Current, const FRotator& Target, float DeltaTime, float InterpSpeed)
-{
-    return FMath::RInterpTo(Current, Target, DeltaTime, InterpSpeed);
 }

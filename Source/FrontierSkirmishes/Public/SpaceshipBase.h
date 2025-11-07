@@ -120,7 +120,7 @@ protected:
     float BoostDodgeCooldown;
 
     // CURRENT STATE
-    FVector2D MouseInput;
+    FVector2D AimInput;
     float ThrottleInput;
     float ManualRollInput;
 
@@ -146,9 +146,6 @@ protected:
     void UpdateRotation(float DeltaTime);
     void UpdateVelocity(float DeltaTime);
     void UpdateBoostDodge(float DeltaTime);
-
-    // Smooth rotation helper
-    FRotator SmoothRotateTowards(const FRotator& Current, const FRotator& Target, float DeltaTime, float InterpSpeed);
 
 public:
     virtual void Tick(float DeltaTime) override;
