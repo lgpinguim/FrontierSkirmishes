@@ -49,25 +49,31 @@ protected:
     class UInputMappingContext* InputMapping;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-    class UInputAction* MouseAimAction;
+    class UInputAction* PitchAction;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-    class UInputAction* ThrottleAction; 
+    class UInputAction* YawAction;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    class UInputAction* ThrottleAction;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     class UInputAction* RollAction;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-    class UInputAction* BoostDodgeAction;  // Quick directional boost
+    class UInputAction* BoostDodgeAction;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-    class UInputAction* PrimaryWeaponAction;  // Machine guns
+    class UInputAction* BrakeAction;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-    class UInputAction* SecondaryWeaponAction;  // Missiles
+    class UInputAction* PrimaryWeaponAction;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-    class UInputAction* CycleWeaponAction;  // Switch missile types
+    class UInputAction* SecondaryWeaponAction;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    class UInputAction* CycleWeaponAction;
 
     // MOVEMENT PROPERTIES
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
@@ -83,31 +89,53 @@ protected:
     float Deceleration;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-    float TurnResponsiveness;  // How quickly ship follows mouse
+    float BrakeDeceleration;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-    float MaxTurnRate;  // Limits how fast we can turn
+    float TurnResponsiveness;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+    float MaxTurnRate;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
     float RollRate;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-    float MouseSensitivity;  // How sensitive mouse input is
+    float MouseSensitivity;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-    float AutoRollStrength;  // How much ship rolls into turns
+    float AutoRollStrength;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-    float AutoLevelSpeed;  // How fast ship returns to level flight
+    float AutoLevelSpeed;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-    float MaxPitchAngle;  // Maximum pitch up/down in degrees
+    bool bEnableAutoLevel;  // Toggle auto-leveling on/off
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-    float MaxYawAngle;    // Maximum yaw left/right in degrees
+    float MaxPitchAngle;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-    float MaxRollAngle;    // Maximum roll angle in degrees (recommended: 60-90 degrees)
+    float MaxRollAngle;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+    bool bEnableRotationLimits;
+
+    // CAMERA PROPERTIES
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+    float CameraLagSpeed;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+    float CameraLagMaxDistance;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+    float BaseFOV;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+    float BoostFOV;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+    float FOVInterpSpeed;
 
     // BOOST DODGE 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Boost Dodge")
@@ -119,13 +147,19 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Boost Dodge")
     float BoostDodgeCooldown;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Boost Dodge")
+    float BoostDodgeCameraShakeScale;
+
     // CURRENT STATE
-    FVector2D AimInput;
+    float PitchInput;
+    float YawInput;
     float ThrottleInput;
     float ManualRollInput;
+    bool bIsBraking;
+    bool bManualRollActive = false;
 
-    FVector CurrentVelocity;
     float CurrentSpeed;
+    float CurrentFOV;
 
     // Boost Dodge state
     bool bIsBoostDodging;
@@ -134,18 +168,26 @@ protected:
     float BoostDodgeCooldownTimer;
 
     // INPUT FUNCTIONS
-    void HandleMouseAim(const FInputActionValue& Value);
+    void HandlePitch(const FInputActionValue& Value);
+    void HandleYaw(const FInputActionValue& Value);
     void HandleThrottle(const FInputActionValue& Value);
     void HandleRoll(const FInputActionValue& Value);
     void HandleBoostDodge(const FInputActionValue& Value);
+    void HandleBrake(const FInputActionValue& Value);
+    void HandleBrakeReleased(const FInputActionValue& Value);
     void HandlePrimaryWeapon(const FInputActionValue& Value);
     void HandleSecondaryWeapon(const FInputActionValue& Value);
     void HandleCycleWeapon(const FInputActionValue& Value);
 
-    // ADVANCED MOVEMENT FUNCTIONS
+    // MOVEMENT FUNCTIONS
     void UpdateRotation(float DeltaTime);
     void UpdateVelocity(float DeltaTime);
     void UpdateBoostDodge(float DeltaTime);
+    void UpdateCamera(float DeltaTime);
+
+    // HELPER FUNCTIONS
+    FRotator ClampRotation(const FRotator& Rotation) const;
+    void HandleCollision(const FHitResult& Hit);
 
 public:
     virtual void Tick(float DeltaTime) override;
@@ -157,4 +199,13 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "Spaceship")
     bool CanBoostDodge() const { return BoostDodgeCooldownTimer <= 0.0f && !bIsBoostDodging; }
+
+    UFUNCTION(BlueprintPure, Category = "Spaceship")
+    FVector GetCurrentVelocity() const { return GetActorForwardVector() * CurrentSpeed; }
+
+    UFUNCTION(BlueprintPure, Category = "Spaceship")
+    float GetCurrentSpeed() const { return CurrentSpeed; }
+
+    UFUNCTION(BlueprintPure, Category = "Spaceship")
+    bool IsBraking() const { return bIsBraking; }
 };
