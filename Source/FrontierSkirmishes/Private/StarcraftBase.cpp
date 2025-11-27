@@ -8,5 +8,16 @@
 
 AStarcraftBase::AStarcraftBase()
 {
-
+	PrimaryActorTick.bCanEverTick = false;
+	
+	
+	// CameraBoom = CreateDefaultSubobject<USpringArmComponent>("CameraBoom");
+	// CameraBoom->SetupAttachment(GetRootComponent());
+	// CameraBoom->TargetArmLength = 600.0f; //Edit this value to around 2,5K
+	// CameraBoom->bUsePawnControlRotation = true;
+	//
+	// FollowCamera = CreateDefaultSubobject<UCameraComponent>("FollowCamera");
+	// FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	// FollowCamera->bUsePawnControlRotation = false;
+	
 }

@@ -6,9 +6,9 @@
 #include "WheeledVehiclePawn.h"
 #include "StarcraftBase.generated.h"
 
-/**
- * 
- */
+class UCameraComponent;
+class USpringArmComponent;
+
 UCLASS()
 class FRONTIERSKIRMISHES_API AStarcraftBase : public AWheeledVehiclePawn
 {
@@ -17,6 +17,14 @@ class FRONTIERSKIRMISHES_API AStarcraftBase : public AWheeledVehiclePawn
 public:
 
 	AStarcraftBase();
+	
+private:
+	
+	// UPROPERTY(VisibleAnywhere, Category = "Camera")
+	// TObjectPtr<USpringArmComponent> CameraBoom;
+	//
+	// UPROPERTY(VisibleAnywhere, Category = "Camera")
+	// TObjectPtr<UCameraComponent> FollowCamera;
 
 protected:
 
